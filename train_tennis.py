@@ -30,12 +30,19 @@ if __name__ == "__main__":
 
     agents = MADDPG(state_size=24,
                     action_size=2,
-                    n_agents=2)
+                    n_agents=2,
+                    gamma=0.99,
+                    tau=1e-3,
+                    lr_actor=1e-4,
+                    lr_critic=3e-4,
+                    memory_size=int(1e5),
+                    batch_size=256)
 
     # amplitude of OU noise
     # this slowly decreases to 0
     noise = 2
     noise_reduction = 0.9999
+    noise_min = 0.1
 
     n_episodes = 2500
     max_t = 1000
@@ -52,6 +59,7 @@ if __name__ == "__main__":
 
             actions = agents.act(states, noise=noise)
             noise *= noise_reduction
+            noise = max(noise, noise_min)
 
             env_info = env.step(actions)[brain_name]  # send all actions to tne environment
 
@@ -70,6 +78,6 @@ if __name__ == "__main__":
         # update target network per episode
         agents.update_targets()
 
-        print('episode: {}, total steps: {}, max score: {}'.format(i, step_counter, np.round(np.max(scores), 4)))
+        print('episode: {}, noise: {}, max score: {}'.format(i, noise, np.round(np.max(scores), 4)))
 
     env.close()
