@@ -13,7 +13,7 @@ import torch.optim as optim
 
 import torchsummary as TorchSummary
 
-from utilities import hard_update, soft_update
+from utilities import hard_update_A_from_B, soft_update_A_from_B
 from networks import Actor
 from networks import Critic
 # add OU noise for exploration
@@ -27,8 +27,6 @@ class DDPG:
                  in_actor,
                  out_actor,
                  in_critic,  # e.g. = n_agent * (state_size + action_size)
-                 gamma=0.99,  # discount factor
-                 tau=1e-3,  # for soft update of target network parameters
                  lr_actor=1e-4,
                  lr_critic=1e-3,  # better learn faster than actor
                  random_seed=2):
@@ -38,8 +36,6 @@ class DDPG:
 
         self.params = {"lr_actor": lr_actor,
                        "lr_critic": lr_critic,
-                       "gamma": gamma,
-                       "tau": tau,
                        "optimizer": "adam"}
 
         self.local_actor = Actor(in_shape=in_actor, out_shape=out_actor).to(device)
@@ -54,45 +50,56 @@ class DDPG:
 
         # Q: should local/target start with same weights ? synchronized after first copy after all
         # A: better hard copy at the beginning
-        hard_update(self.target_actor, self.local_actor)
-        hard_update(self.target_critic, self.local_critic)
+        hard_update_A_from_B(self.target_actor, self.local_actor)
+        hard_update_A_from_B(self.target_critic, self.local_critic)
 
         # Noise process
         self.noise = OUNoise(out_actor, scale=1.0)
 
     def act(self, obs, noise=0.0):
         obs = obs.to(device)
-        action = self.local_actor(obs) + noise * self.noise.noise()
+        action = self.local_actor(obs) + noise * self.noise.noise().to(device)
         return action
 
     def target_act(self, obs, noise=0.0):
         obs = obs.to(device)
-        action = self.target_actor(obs) + noise * self.noise.noise()
+        action = self.target_actor(obs) + noise * self.noise.noise().to(device)
         return action
+
+    def reset(self):
+        self.noise.reset()
 
 
 class MADDPG:
     def __init__(self,
-                 state_size=24,
-                 action_size=2,
-                 n_agents=2,
+                 state_size,
+                 action_size,
+                 n_agents,
+                 gamma=0.99,  # discount factor
+                 tau=1e-3,  # for soft update of target network parameters
+                 lr_actor=1e-4,
+                 lr_critic=1e-3,  # better learn faster than actor
                  memory_size=int(1e5),  # replay buffer size
-                 batch_size=128):       # minibatch size
+                 batch_size=256):       # minibatch size
 
+        self.n_agents = n_agents
         self.batch_size = batch_size
-        self.param = dict(state_size=state_size,
-                          action_size=action_size,
-                          n_agents=n_agents,
-                          memory_size=memory_size,
-                          batch_size=batch_size)
+        self.params = dict(state_size=state_size,
+                           action_size=action_size,
+                           n_agents=n_agents,
+                           gamma=gamma,
+                           tau=tau,
+                           lr_actor=lr_actor,
+                           lr_critic=lr_critic,
+                           memory_size=memory_size,
+                           batch_size=batch_size)
 
+        # initialize ddpg agents
         agent_config = dict(in_actor=state_size,
                             out_actor=action_size,
                             in_critic=n_agents*(state_size+action_size),
-                            gamma=0.99,
-                            tau=0.01,
-                            lr_actor=0.0001,
-                            lr_critic=0.0001)
+                            lr_actor=lr_actor,
+                            lr_critic=lr_critic)
         self.agent_pool = [DDPG(**agent_config) for i in range(n_agents)]  # list of DDPG agent
 
         self.memory = ReplayBuffer(memory_size, batch_size)
@@ -101,20 +108,20 @@ class MADDPG:
         self.target_step = 0
 
     def reset(self):
-        #self.noise.reset()
-        pass
+        for agent in self.agent_pool:
+            agent.reset()
 
-    def act(self, state, add_noise=True):
-        # # for single agent only
-        # state = torch.from_numpy(state).float().unsqueeze(0).to(device)
-        # self.actor_local.eval()  # must set to eval mode, since BatchNorm used
-        # with torch.no_grad():
-        #     action = self.actor_local(state).cpu().data.numpy()
-        # self.actor_local.train()
-        # if add_noise:
-        #     action += self.noise.sample()
-        # return np.clip(action.squeeze(), -1, 1)
-        pass
+    def act(self, obs_all_agents, noise=0.0):
+        states = torch.from_numpy(obs_all_agents).float().unsqueeze(0).to(device)
+
+        actions = []
+        for ddpg_agent, obs in zip(self.agent_pool, states.transpose(0, 1)):
+            ddpg_agent.local_actor.eval()  # must set to eval mode, since BatchNorm used
+            with torch.no_grad():
+                actions.append(ddpg_agent.act(obs, noise).cpu().numpy().ravel().tolist())
+            ddpg_agent.local_actor.train()
+        return actions
+
 
     def eval_local_act(self, obs_all_agents, noise=0.0):
         """
@@ -132,19 +139,18 @@ class MADDPG:
         get target network actions from all the agents in the MADDPG object
 
         :param obs_all_agents: tensor, rank=3, shape=[batch_size, n_agents, in_critic]
-        :param noise:
         :return: list of tensor, tensor rank=2, shape=[batch_size, out_actor]
         """
         target_actions = [ddpg_agent.target_act(obs, noise) for ddpg_agent, obs in zip(self.agent_pool, obs_all_agents.transpose(0, 1))]
         return target_actions
 
     def step(self, state, action, reward, next_state, done):
-        # self.memory.add(state, action, reward, next_state, done)
-        #
-        # if len(self.memory) > self.params["batch_size"]:
-        #     experiences = self.memory.sample()  # list of tensors
-        #     self.learn(experiences, self.params["gamma"])
-        pass
+        self.memory.add(state, action, reward, next_state, done)
+
+        if len(self.memory) > self.params["batch_size"]:
+            experiences = self.memory.sample()  # list of tensors
+            for agent_id in range(self.n_agents):
+                self.update_agent_with_id(experiences, agent_id, self.params["gamma"])
 
     def update_agent_with_id(self, experiences, agent_id, gamma, logger=None):
         """
@@ -167,7 +173,7 @@ class MADDPG:
         # dones   -> rank=2, shape=[batch_size, agent_id]
         states, actions, rewards, next_states, dones = experiences
 
-        # update this agent
+        # to update this agent
         agent = self.agent_pool[agent_id]
 
         # ------------------------------------------
@@ -256,8 +262,8 @@ class MADDPG:
         """
         self.target_step += 1
         for ddpg_agent in self.agent_pool:
-            soft_update(ddpg_agent.target_actor, ddpg_agent.local_actor, self.param["tau"])
-            soft_update(ddpg_agent.target_critic, ddpg_agent.local_critic, self.param["tau"])
+            soft_update_A_from_B(ddpg_agent.target_actor, ddpg_agent.local_actor, self.params["tau"])
+            soft_update_A_from_B(ddpg_agent.target_critic, ddpg_agent.local_critic, self.params["tau"])
 
 
 class ReplayBuffer:
