@@ -1,5 +1,5 @@
 # https://github.com/ikostrikov/pytorch-ddpg-naf/blob/master/ddpg.py#L15
-def hard_update(target, source):
+def hard_update_A_from_B(target, source):
     """
     Copy network parameters from source to target
     Inputs:
@@ -11,7 +11,7 @@ def hard_update(target, source):
 
 
 # https://github.com/ikostrikov/pytorch-ddpg-naf/blob/master/ddpg.py#L11
-def soft_update(target, source, tau):
+def soft_update_A_from_B(target, source, tau):
     """
     Perform DDPG soft update (move target params toward source based on weight
     factor tau)
