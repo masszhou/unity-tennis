@@ -265,6 +265,16 @@ class MADDPG:
             soft_update_A_from_B(ddpg_agent.target_actor, ddpg_agent.local_actor, self.params["tau"])
             soft_update_A_from_B(ddpg_agent.target_critic, ddpg_agent.local_critic, self.params["tau"])
 
+    def save(self):
+        for agent_id, agent in enumerate(self.agent_pool):
+            torch.save(agent.local_actor.state_dict(), 'checkpoint_actor_local_' + str(agent_id) + '.pth')
+            torch.save(agent.local_critic.state_dict(), 'checkpoint_critic_local_' + str(agent_id) + '.pth')
+
+    def restore(self):
+        for agent_id, agent in enumerate(self.agent_pool):
+            agent.local_actor.load_state_dict(torch.load('checkpoint_actor_local_' + str(agent_id) + '.pth'))
+            agent.local_critic.load_state_dict(torch.load('checkpoint_critic_local_' + str(agent_id) + '.pth'))
+
 
 class ReplayBuffer:
     """Fixed-size buffer to store experience tuples."""
