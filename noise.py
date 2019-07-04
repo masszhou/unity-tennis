@@ -25,3 +25,16 @@ class OUNoise:
         dx = self.theta * (self.mu - x) + self.sigma * np.random.randn(len(x))
         self.state = x + dx
         return torch.tensor(self.state * self.scale).float()
+
+
+# https://github.com/gtg162y/DRLND/blob/master/P3_Collab_Compete/Tennis_Udacity_Workspace.ipynb
+class Gaussian:
+    def __init__(self, action_dimension, scale=0.1, mu=0, sigma=0.5):
+        self.action_dimension = action_dimension
+        self.scale = scale
+        self.mu = mu
+        self.sigma = sigma
+
+    def noise(self):
+        noise = self.sigma * np.random.randn(self.action_dimension)
+        return torch.from_numpy(noise).float()
