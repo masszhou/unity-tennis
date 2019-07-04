@@ -5,7 +5,7 @@ from MADDPG import MADDPG
 
 
 if __name__ == "__main__":
-    env = UnityEnvironment(file_name="./Tennis_Linux/Tennis.x86_64")
+    env = UnityEnvironment(file_name="./Tennis_Linux/Tennis.x86_64", no_graphics=True)
 
     # get the default brain
     brain_name = env.brain_names[0]
@@ -34,20 +34,20 @@ if __name__ == "__main__":
                     gamma=0.99,
                     tau=1e-3,
                     lr_actor=1e-4,
-                    lr_critic=3e-4,
+                    lr_critic=1e-3,
                     memory_size=int(1e5),
                     batch_size=256)
 
     # amplitude of OU noise
     # this slowly decreases to 0
     noise = 2
-    noise_reduction = 0.9999
+    noise_reduction = 0.999
     noise_min = 0.1
 
     n_episodes = 2500
     max_t = 1000
 
-    for i in range(n_episodes):  # play game for 5 episodes
+    for i_episode in range(n_episodes):  # play game for 5 episodes
         env_info = env.reset(train_mode=True)[brain_name]  # reset the environment
         states = env_info.vector_observations  # get the current state (for each agent)
         scores = np.zeros(num_agents)  # initialize the score (for each agent)
@@ -78,6 +78,10 @@ if __name__ == "__main__":
         # update target network per episode
         agents.update_targets()
 
-        print('episode: {}, noise: {}, max score: {}'.format(i, noise, np.round(np.max(scores), 4)))
+        print('episode: {}, noise: {}, max score: {}'.format(i_episode, noise, np.max(scores)))
+        if i_episode % 500 == 0:
+            agents.save()
+
+    agents.save()
 
     env.close()
