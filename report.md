@@ -1,13 +1,15 @@
 [TOC]
 # 1. MADDPG
 ### 1.1 Motivation
-* Due to the interactions between multiple agents, the state of game could be not stationary, and hard(impossible) to learn.
+* When a game involves multiple agents, sometimes we need the agents to learn the policy w.r.t global advantages by compete or collaborate with each other to win the game.
+* Due to the interactions between multiple agents, the state of game could be not stationary, and hard (impossible) to learn.
 * The solution is using Actor-Critic, more specifically "centralized critic" + "decentralized actors"
 * Benefits of centralized critic
   * training with global estimation, which let considering collaborate and competitive possible
 * Benefits of decentralized actors
-  * independent actors during working
-  * communication between actors
+  * independent actors during working.
+* Questions, which not solved in this project yet.
+  * I implement a MADDPG with centralized critic in this project, however how and what the actors should communicate or sense with each other was not discussed in this project yet.
 
 ### 1.2 Notation and Model
 * There are $N$ agents
@@ -25,7 +27,7 @@
   * separately means each agent has own critic network
   * the critic of each agent learns from training data of all agents
   * a better illustration can be found in below fig. 
-![maddpg](../../imgs/maddpg.gif)
+![maddpg](./imgs/maddpg.gif)
 #####  **critic updates**
 $$
 \begin{eqnarray}
@@ -46,7 +48,7 @@ psudo codes
 # dones   -> rank=2, shape=[batch_size, agent_id]
 states, actions, rewards, next_states, dones = experiences
 
-# update this agent
+# to update this agent
 agent = self.agent_pool[agent_id]
 
 # ------------------------------------------
@@ -63,33 +65,33 @@ agent = self.agent_pool[agent_id]
 # self.critic_optimizer.step()
 
 target_actions = self.eval_target_act(next_states)  
-# list of tensor, tensor rank=2, shape=[batch_size, out_actor]
+# out list of tensor, tensor rank=2, shape=[batch_size, out_actor]
 
 target_actions = torch.cat(target_actions, dim=1)  
-# tensor, rank=2, shape=[batch_size, n_agent*action_size]
+# out tensor, rank=2, shape=[batch_size, n_agent*action_size]
 
-# tensor, rank=2, shape=[batch_size, n_agent*state_size]
-# tensor, rank=2, shape=[batch_size, n_agent*action_size]
+# in tensor, rank=2, shape=[batch_size, n_agent*state_size]
+# in tensor, rank=2, shape=[batch_size, n_agent*action_size]
 target_critic_input = torch.cat((next_states.view(self.batch_size, -1),  
                                  target_actions),  
                                 dim=1).to(device)
-# tensor, rank=2, shape=[batch_size, n_agent*(state_size+action_size)]
+# out tensor, rank=2, shape=[batch_size, n_agent*(state_size+action_size)]
 
 with torch.no_grad():
     q_next = agent.target_critic(target_critic_input)  
-    # rank=2, shape=[batch_size, 1]
+    # out tensor, rank=2, shape=[batch_size, 1]
 
 agent_rewards = rewards[:, agent_id] 
-# rank = 1, shape = [batch_size]
+# out tensor, rank = 1, shape = [batch_size]
 
 agent_dones = dones[:, agent_id] 
-# rank = 1, shape = [batch_size]
+# out tensor, rank = 1, shape = [batch_size]
 
 q_target = agent_rewards.view(-1, 1) + gamma * q_next * (1 - agent_dones.view(-1, 1))
-# rank=2, shape=[batch_size, 1]
+# out tensor, rank=2, shape=[batch_size, 1]
 
-# tensor, rank=2, shape=[batch_size, n_agent*state_size]
-# tensor, rank=2, shape=[batch_size, n_agent*action_size]
+# out tensor, rank=2, shape=[batch_size, n_agent*state_size]
+# out tensor, rank=2, shape=[batch_size, n_agent*action_size]
 local_critic_input = torch.cat((states.view(self.batch_size, -1),  
                                 actions.view(self.batch_size, -1)),  
                                 dim=1).to(device)
