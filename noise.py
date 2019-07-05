@@ -22,7 +22,8 @@ class OUNoise:
 
     def noise(self):
         x = self.state
-        dx = self.theta * (self.mu - x) + self.sigma * np.random.randn(len(x))
+        # dx = self.theta * (self.mu - x) + self.sigma * np.random.randn(len(x))
+        dx = self.theta * (self.mu - x) + self.sigma * np.random.standard_normal(self.action_dimension)
         self.state = x + dx
         return torch.tensor(self.state * self.scale).float()
 
