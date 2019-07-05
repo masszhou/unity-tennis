@@ -8,7 +8,7 @@ class OUNoise:
     Ornstein-Uhlenbeck process.
     explore around mu
     """
-    def __init__(self, action_dimension, scale=0.1, mu=0, theta=0.15, sigma=0.2):
+    def __init__(self, action_dimension, scale=1, mu=0, theta=0.15, sigma=0.5):
         self.action_dimension = action_dimension
         self.scale = scale
         self.mu = mu
@@ -22,7 +22,6 @@ class OUNoise:
 
     def noise(self):
         x = self.state
-        # dx = self.theta * (self.mu - x) + self.sigma * np.random.randn(len(x))
         dx = self.theta * (self.mu - x) + self.sigma * np.random.standard_normal(self.action_dimension)
         self.state = x + dx
         return torch.tensor(self.state * self.scale).float()

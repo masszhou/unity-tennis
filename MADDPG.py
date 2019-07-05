@@ -58,16 +58,17 @@ class DDPG:
 
     def act(self, obs, noise_scale=0.0):
         obs = obs.to(device)
-        noise = torch.from_numpy(noise_scale*0.5*np.random.randn(1, self.action_size)).float().to(device)
-        action = self.local_actor(obs) + noise
-        # action = self.local_actor(obs) + noise_scale * self.noise.noise().to(device)
+        # debug noise
+        # noise = torch.from_numpy(noise_scale*0.5*np.random.randn(1, self.action_size)).float().to(device)
+        # action = self.local_actor(obs) + noise
+        action = self.local_actor(obs) + noise_scale * self.noise.noise().to(device)
         return action
 
     def target_act(self, obs, noise_scale=0.0):
         obs = obs.to(device)
-        noise = torch.from_numpy(noise_scale*0.5 * np.random.randn(1, self.action_size)).float().to(device)
-        action = self.target_actor(obs) + noise_scale * noise
-        # action = self.target_actor(obs) + noise_scale * self.noise.noise().to(device)
+        # noise = torch.from_numpy(noise_scale*0.5 * np.random.randn(1, self.action_size)).float().to(device)
+        # action = self.target_actor(obs) + noise_scale * noise
+        action = self.target_actor(obs) + noise_scale * self.noise.noise().to(device)
         return action
 
     def reset(self):
