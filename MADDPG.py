@@ -56,14 +56,18 @@ class DDPG:
         # Noise process
         self.noise = OUNoise(out_actor, scale=1.0)
 
-    def act(self, obs, noise=0.0):
+    def act(self, obs, noise_scale=0.0):
         obs = obs.to(device)
-        action = self.local_actor(obs) + noise * self.noise.noise().to(device)
+        noise = torch.from_numpy(noise_scale*0.5*np.random.randn(1, self.action_size)).float().to(device)
+        action = self.local_actor(obs) + noise
+        # action = self.local_actor(obs) + noise_scale * self.noise.noise().to(device)
         return action
 
-    def target_act(self, obs, noise=0.0):
+    def target_act(self, obs, noise_scale=0.0):
         obs = obs.to(device)
-        action = self.target_actor(obs) + noise * self.noise.noise().to(device)
+        noise = torch.from_numpy(noise_scale*0.5 * np.random.randn(1, self.action_size)).float().to(device)
+        action = self.target_actor(obs) + noise_scale * noise
+        # action = self.target_actor(obs) + noise_scale * self.noise.noise().to(device)
         return action
 
     def reset(self):
@@ -75,12 +79,14 @@ class MADDPG:
                  state_size,
                  action_size,
                  n_agents,
-                 gamma=0.99,  # discount factor
-                 tau=1e-3,  # for soft update of target network parameters
+                 gamma=0.99,                # discount factor
+                 tau=1e-3,                  # for soft update of target network parameters
+                 learn_n_times_per_step=5,  # in case data is sparse, let agent sample and lear n times per step
+                 update_target_every=10,    # update target net every 10 updates of local net
                  lr_actor=1e-4,
-                 lr_critic=1e-3,  # better learn faster than actor
-                 memory_size=int(1e5),  # replay buffer size
-                 batch_size=256):       # minibatch size
+                 lr_critic=1e-3,            # better learn faster than actor
+                 memory_size=int(1e5),      # replay buffer size
+                 batch_size=256):           # minibatch size
 
         self.n_agents = n_agents
         self.batch_size = batch_size
@@ -92,6 +98,8 @@ class MADDPG:
                            lr_actor=lr_actor,
                            lr_critic=lr_critic,
                            memory_size=memory_size,
+                           learn_n_times_per_step=learn_n_times_per_step,
+                           update_target_every=update_target_every,
                            batch_size=batch_size)
 
         # initialize ddpg agents
@@ -111,17 +119,18 @@ class MADDPG:
         for agent in self.agent_pool:
             agent.reset()
 
-    def act(self, obs_all_agents, noise=0.0):
+    def act(self, obs_all_agents, noise_scale=0.0):
         states = torch.from_numpy(obs_all_agents).float().unsqueeze(0).to(device)
 
         actions = []
         for ddpg_agent, obs in zip(self.agent_pool, states.transpose(0, 1)):
             ddpg_agent.local_actor.eval()  # must set to eval mode, since BatchNorm used
             with torch.no_grad():
-                actions.append(ddpg_agent.act(obs, noise).cpu().numpy().ravel().tolist())
+                action = ddpg_agent.act(obs, noise_scale).cpu().numpy().ravel()
+                action = np.clip(action, -1, 1)
+                actions.append(action.tolist())
             ddpg_agent.local_actor.train()
         return actions
-
 
     def eval_local_act(self, obs_all_agents, noise=0.0):
         """
@@ -147,10 +156,15 @@ class MADDPG:
     def step(self, state, action, reward, next_state, done):
         self.memory.add(state, action, reward, next_state, done)
 
+    def learn(self, logger=None):
         if len(self.memory) > self.params["batch_size"]:
-            experiences = self.memory.sample()  # list of tensors
-            for agent_id in range(self.n_agents):
-                self.update_agent_with_id(experiences, agent_id, self.params["gamma"])
+            # sample and learn multiple times per step(acquiring new knowledge from env)
+            for i_sample in range(self.params["learn_n_times_per_step"]):
+                experiences = self.memory.sample()  # list of tensors
+                for agent_id in range(self.n_agents):
+                    self.update_agent_with_id(experiences, agent_id, self.params["gamma"], logger=logger)
+
+            self.update_targets()
 
     def update_agent_with_id(self, experiences, agent_id, gamma, logger=None):
         """
