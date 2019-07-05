@@ -51,7 +51,8 @@ if __name__ == "__main__":
 
     n_episodes = 50000
     max_t = 1000
-    score_avg = deque(maxlen=50)
+    smoothing = 100
+    score_avg = deque(maxlen=smoothing)
 
     log_path = os.getcwd() + "/logs"
     model_dir = os.getcwd() + "/models"
@@ -101,7 +102,7 @@ if __name__ == "__main__":
         if i_episode % 500 == 0:
             agents.save()
 
-        if np.mean(score_avg) > 0.5:
+        if np.mean(score_avg) > 0.8 and len(score_avg) == smoothing:
             agents.save()
             print("solved")
             break
