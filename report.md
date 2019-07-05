@@ -1,15 +1,17 @@
 [TOC]
 # 1. MADDPG
-### 1.1 Motivation
-* When a game involves multiple agents, sometimes we need the agents to learn the policy w.r.t global advantages by compete or collaborate with each other to win the game.
+MADDPG stands for "Multi-Agents Deep Deterministic Policy Gradient", originally proposed by [Lowe et al., 2017](https://arxiv.org/pdf/1706.02275.pdf)
+
+### 1.1 Introduction
+
+* When a game involves multiple agents, sometimes we need the agents to learn a policy w.r.t. global advantages by compete or collaborate with each other to win the game.
 * Due to the interactions between multiple agents, the state of game could be not stationary, and hard (impossible) to learn.
 * The solution is using Actor-Critic, more specifically "centralized critic" + "decentralized actors"
-* Benefits of centralized critic
-  * training with global estimation, which let considering collaborate and competitive possible
-* Benefits of decentralized actors
-  * independent actors during working.
+* Using "centralized critic" to evaluate the global advantages, to find the path to win the game
+* Using "decentralized actors" to form a policy for each agent based on the guides from "centralized critic"
 * Questions, which not solved in this project yet.
-  * I implement a MADDPG with centralized critic in this project, however how and what the actors should communicate or sense with each other was not discussed in this project yet.
+  * I implement a general MADDPG with centralized critic in this project, however how and what the actors should communicate or sense with each other was not discussed in this project yet.
+* A short review of single agent DDPG from my last [project](https://github.com/masszhou/unity_reacher/blob/master/report.pdf).
 
 ### 1.2 Notation and Model
 * There are $N$ agents
@@ -28,7 +30,8 @@
   * the critic of each agent learns from training data of all agents
   * a better illustration can be found in below fig. 
 ![maddpg](./imgs/maddpg.gif)
-#####  **critic updates**
+#### Critic Updates
+
 $$
 \begin{eqnarray}
 \mathcal{L}(\theta_i) &=& \mathbb{E}[(Q_i^{\vec{\mu}}(\vec{o},a_1,a_2,\dots,a_N) -y)^2] \\
@@ -104,7 +107,10 @@ critic_loss.backward()
 agent.critic_optimizer.step()
 ```
 
-##### **actor update**
+
+
+#### Actor Update
+
 $$
 \nabla_{\theta_j}J(\mu_j)=\mathbb{E}_{\vec{o},a\in \mathcal{D}}[\nabla_{\theta_j}\mu_i(a_i\vert o_i)\nabla_{a_i}Q_i^{\vec{\mu}}(\vec{o},a_1,\dots,a_N)\vert_{a_i=\mu_i(o_i)}]
 $$
@@ -153,7 +159,7 @@ agent.actor_optimizer.step()
 ```
 
 ### 1.3 Inferring Policies of Other Agents (Communication)
-* How ? key implementation for real project
+* How ? based on task, key implementation for real project
 
 ### 1.4 Agents with Policy Ensembles
 * each agent has K different sub-policies
@@ -161,17 +167,55 @@ agent.actor_optimizer.step()
 * At each episode, we randomly select one particular sub-policy for each agent to execute. 
 
 ### 1.5 Reward Design for Collaborate and Competitive
-* How? Key implementation for real project
+* How? based on task, Key implementation for real project
 
 ### Reference
-* a good [blog](https://lilianweng.github.io/lil-log/2018/04/08/policy-gradient-algorithms.html#maddpg) 
+* a good state of the art [blog](https://lilianweng.github.io/lil-log/2018/04/08/policy-gradient-algorithms.html#maddpg) 
 * the original paper ([Lowe et al., 2017](https://arxiv.org/pdf/1706.02275.pdf)). 
 * The original paper and this explanation blog have very clean and beautiful math notation.
 
 * a good [blog](https://openai.com/blog/learning-to-cooperate-compete-and-communicate/) from openai
 
 # 2. Implementation Details
-* update frequency of target network
-  * I noticed in OpenAI showcase implementation. Hard copy for target network is per n-episodes.
-  * my previous implementation is n-learningsteps.
-  * The influence of my experience is that larger update steps let training more consistent.
+### 2.1 Setups
+
+```python
+agents = MADDPG(state_size=24,                
+                action_size=2,
+                n_agents=2,
+                gamma=0.99,
+                tau=1e-3,
+                lr_actor=1e-4,
+                lr_critic=5e-4,                
+                learn_n_times_per_step=3,
+                update_target_every=10,
+                memory_size=int(1e5),
+                batch_size=256)
+```
+
+* who often update target network from local network is a **KEY** parameter for convergence and consistence training result. 
+
+* add proper noise to action is a **KEY** step to explore efficiently.
+  * e.g. $dx$ from Ornstein-Uhlenbeck Process can not be too small. in this project, I used sigma=0.5
+* learning rate of critic network is important
+
+### 2.2 Results and Discussion
+
+* episodic rewards of two agents
+
+  * agent0
+![](./imgs/agent0.png)
+
+  * agent1
+![](./imgs/agent1.png)
+
+
+
+Here are some interesting guess. I observed episodic rewards of the two agents. From episode 0-400, it seems both agents were doing exploration. For episode 400-1200, it seems two agent have **complementary** performance, like adversary, one became great, the other turns to weak, very interesting. 
+
+However in this project I didn't add communication between agents for actor input and explicit extra rewards for collaboration. It is **NOT** very clear, in my opinion, whether the agent has just finally improved own skills or it really learned to play with considering collaboration.
+
+* evaluation
+  * average score of 100 episodes is 1.33 (> 0.5 -> solved )
+
+![](./imgs/eval.png)
