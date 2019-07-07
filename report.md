@@ -194,10 +194,36 @@ agents = MADDPG(state_size=24,
 ```
 
 * who often update target network from local network is a **KEY** parameter for convergence and consistence training result. 
-
 * add proper noise to action is a **KEY** step to explore efficiently.
-  * e.g. $dx$ from Ornstein-Uhlenbeck Process can not be too small. in this project, I used sigma=0.5
+  * e.g.  $dx$ from Ornstein-Uhlenbeck Process can not be too small. in this project, I used sigma=0.5
 * learning rate of critic network is important
+
+Actor Network
+
+```
+# input layer
+# fully connected layer 1, 24x400
+# batch normalization
+# Relu
+# fully connected layer 2, 400x300
+# Relu
+# fully connected layer 3, 300x2
+# tanh
+```
+
+Critic Network
+
+```
+# input layer
+# fully connected layer 1, 52x400
+# batch normalization
+# Relu
+# fully connected layer 2, 400x300
+# Relu
+# fully connected layer 3, 300x1
+```
+
+
 
 ### 2.2 Results and Discussion
 
@@ -219,3 +245,9 @@ However in this project I didn't add communication between agents for actor inpu
   * average score of 100 episodes is 1.33 (> 0.5 -> solved )
 
 ![](./imgs/eval.png)
+
+
+
+### 2.3 Future Works
+
+test and implement crawler environments with competition rewards and limited communication between agents.

@@ -1,4 +1,4 @@
-[//]: # (Image References)
+[//]: # "Image References"
 
 [image1]: https://user-images.githubusercontent.com/10624937/42135623-e770e354-7d12-11e8-998d-29fc74429ca2.gif "Trained Agent"
 [image2]: https://user-images.githubusercontent.com/10624937/42135622-e55fb586-7d12-11e8-8a54-3c31da15a90a.gif "Soccer"
@@ -44,14 +44,15 @@ The environment is considered solved, when the average (over 100 episodes) of th
 2. Place the file in the root folder of GitHub repository, and unzip (or decompress) the file. 
 3. The environment was modified by Udacity, and it is **not identical** to original unity tennis environment.
 
-# 2. Unity Crawler (Optional)
-![Trained Agent][image2]
+### 1.6 Train & Evaluation
+* train script
 
-1. Download the environment from one of the links below.  You need only select the environment that matches your operating system:
-- Linux: [click here](https://s3-us-west-1.amazonaws.com/udacity-drlnd/P3/Soccer/Soccer_Linux.zip)
-- Mac OSX: [click here](https://s3-us-west-1.amazonaws.com/udacity-drlnd/P3/Soccer/Soccer.app.zip)
-- Windows (32-bit): [click here](https://s3-us-west-1.amazonaws.com/udacity-drlnd/P3/Soccer/Soccer_Windows_x86.zip)
-- Windows (64-bit): [click here](https://s3-us-west-1.amazonaws.com/udacity-drlnd/P3/Soccer/Soccer_Windows_x86_64.zip)
+  ```
+  python train_tennis.py
+  ```
 
-2. Place the file in the root folder of GitHub repository, and unzip (or decompress) the file. 
-3. The environment was modified by Udacity, and it is **not identical** to original unity crawler environment.
+* evaluate script
+
+  ```
+  python eval_tennis.py
+  ```
